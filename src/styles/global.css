@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+    background-color: var(--fallback-b3, oklch(var(--b3) / var(--tw-bg-opacity))) !important;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar-track {
+    background-color: #ffffff05;
+}
+
+::-webkit-scrollbar {
+    width: 5px;
+    background-color: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 8px;
+    background-color: #ffffff08;
+}
+
+.custom-scroll-x::-webkit-scrollbar {
+    height: 6px;
+    border-radius: 6px;
+}
+
+.remove-appearance::-webkit-outer-spin-button,
+.remove-appearance::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+
+@keyframes opening {
+    to {
+        @apply bg-gradient-to-br from-white via-transparent to-transparent;
+        transform: scale(1);
+    }
+}
+
+.gradient-background {
+    @apply bg-gradient-to-br from-transparent via-transparent to-transparent;
+}
+
+.animate-opening {
+    animation: opening 0.5s 0.5s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
