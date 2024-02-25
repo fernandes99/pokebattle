@@ -73,11 +73,28 @@ export interface IPokemonMove {
     id: number;
     name: string;
     title: string;
+    description: string;
     power: number;
     accuracy: number;
     criticalRate: number;
     drain: number;
     classDamage: 'physical' | 'special' | 'status';
+    category:
+        | 'damage'
+        | 'ailment'
+        | 'net-good-stats'
+        | 'heal'
+        | 'damage+ailment'
+        | 'damage+lower'
+        | 'damage+raise'
+        | 'damage+heal'
+        | 'force-switch'
+        | 'unique';
+    statChanges: {
+        name: TMoveStatName;
+        change: 1 | -1;
+        target: 'user' | 'all-opponents';
+    }[];
     ailment: {
         name: string;
         chance: number;
@@ -110,3 +127,5 @@ type TPokemonTypeName =
     | 'dark'
     | 'fairy'
     | 'steel';
+
+export type TMoveStatName = 'hp' | 'attack' | 'defense';

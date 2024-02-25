@@ -32,6 +32,18 @@ const battle = createSlice({
                 state.pokemon.ally.stats.hp.current = action.payload;
             }
         },
+        changePokemonEnemyStat(state, action: PayloadAction<{ stat: keyof IPokemon['stats']; value: number }>) {
+            if (state.pokemon.enemy) {
+                const currentStat = state.pokemon.enemy.stats[action.payload.stat].current;
+                state.pokemon.enemy.stats[action.payload.stat].current = currentStat + action.payload.value;
+            }
+        },
+        changePokemonAllyStat(state, action: PayloadAction<{ stat: keyof IPokemon['stats']; value: number }>) {
+            if (state.pokemon.ally) {
+                const currentStat = state.pokemon.ally.stats[action.payload.stat].current;
+                state.pokemon.ally.stats[action.payload.stat].current = currentStat + action.payload.value;
+            }
+        },
         setPokemonEnemyCaptureRate(state, action: PayloadAction<IPokemon['captureRate']>) {
             if (state.pokemon.enemy) {
                 state.pokemon.enemy.captureRate = action.payload;
@@ -61,6 +73,8 @@ export const {
     setPokemonEnemyCaptureRate,
     setPokemonPlayerCurrentHp,
     setBattleStatus,
+    changePokemonEnemyStat,
+    changePokemonAllyStat,
     passRound,
     resetBattleState
 } = battle.actions;

@@ -64,6 +64,26 @@ export interface IResponseGetMove {
         name: string;
         url: string;
     };
+    flavor_text_entries: [
+        {
+            flavor_text: string;
+            language: {
+                name: string;
+                url: string;
+            };
+        }
+    ];
+    stat_changes: {
+        change: 1 | -1;
+        stat: {
+            name: TResponseStatName;
+            url: string;
+        };
+    }[];
+    target: {
+        name: 'user' | 'all-opponents';
+        url: string;
+    };
     meta: {
         ailment: {
             name: string;
@@ -125,6 +145,8 @@ export interface IResponseGetEvolutionChain {
     id: number;
     chain: IChain;
 }
+
+export type TResponseStatName = 'hp' | 'attack' | 'defense' | 'special-attack' | 'special-defense' | 'speed' | 'accuracy' | 'evasion';
 
 interface IChain {
     evolution_details: {

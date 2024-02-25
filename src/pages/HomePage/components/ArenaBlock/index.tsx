@@ -1,37 +1,31 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
+import toast from 'react-hot-toast';
 
 import { RootState } from '@/store';
 import { IPokemon, IPokemonMove } from '@/types/pokemon';
 import { IResponsePokemonMove } from '@/types/pokeApiResponses';
-import { getMovePokemon, getPokemon, getPokemonMoves, playSound } from '@/utils/functions/general';
-import { getPercentage, getRandomIntFromInterval } from '@/utils/functions/number';
-import {
-    addBattleLog,
-    passRound,
-    resetBattleState,
-    setBattleStatus,
-    setPokemonEnemy,
-    setPokemonEnemyCaptureRate,
-    setPokemonEnemyCurrentHp,
-    setPokemonPlayer,
-    setPokemonPlayerCurrentHp
-} from '@/store/reducers/battle';
+import { IDamageVariants } from '@/types/battle';
+import { getMovePokemon, getPokemon, getPokemonMoves, playSound, sleep } from '@/utils/functions/general';
+import { getRandomIntFromInterval } from '@/utils/functions/number';
+import { addBattleLog, passRound, resetBattleState, setBattleStatus, setPokemonEnemy, setPokemonPlayer } from '@/store/reducers/battle';
 import { ExploreBlock } from './ExploreBlock';
 import { PokemonPlayerBlock } from './PokemonPlayerBlock';
 import { ChoicePokemonBlock } from './ChoicePokemonBlock';
 import { PokemonEnemyBlock } from './PokemonEnemyBlock';
-import { DELTA_DAMAGE, MAX_RANDOM_MULTIPLICATOR_DAMAGE, MIN_RANDOM_MULTIPLICATOR_DAMAGE } from '@/constants/deltas';
-import { addPlayerMovePokemon, replacePlayerPokemon, updatePlayerMovePokemon } from '@/store/reducers/player';
-import { Avatar } from '@/components/Avatar';
-import { Pokeball } from '@/components/Pokeball';
-import toast from 'react-hot-toast';
 import { PokemonCatchedBlock } from './PokemonCatchedBlock';
 import { LoseBattleBlock } from './LoseBattleBlock';
 import { WinBattleBlock } from './WinBattleBlock';
-import { getDamageVariants } from '@/utils/functions/battle';
-import { IDamageVariants } from '@/types/battle';
+import { Pokeball } from '@/components/Pokeball';
+import { Avatar } from '@/components/Avatar';
+import { DELTA_DAMAGE, MAX_RANDOM_MULTIPLICATOR_DAMAGE, MIN_RANDOM_MULTIPLICATOR_DAMAGE } from '@/constants/deltas';
+import { addPlayerMovePokemon, replacePlayerPokemon, updatePlayerMovePokemon } from '@/store/reducers/player';
+import { getDamageVariants, handleDamageMove, handleStatsChange } from '@/utils/functions/battle';
+import { slugToTitle } from '@/utils/functions/string';
+import hitSuperEffectiveSound from '@/assets/sounds/moves/hit-super-effective.mp3';
+import hitNotEffectiveSound from '@/assets/sounds/moves/hit-weak-not-very-effective.mp3';
+import hitSound from '@/assets/sounds/moves/hit-normal-damage.mp3';
 
 interface ISwitchMove {
     oldMove: IPokemonMove;
@@ -48,7 +42,9 @@ function ArenaBlock() {
     const dispatch = useDispatch();
     const [loading, setLoading] = useState(false);
     const [choiceNewMove, setChoiceNewMove] = useState<IChoiceNewMove>({ move: null, showMoveToChoice: false, loading: false });
+    const player = useSelector((state: RootState) => state.player);
     const battle = useSelector((state: RootState) => state.battle);
+
     battle.pokemon.enemy && console.log('Enemy', battle.pokemon.enemy);
     battle.pokemon.ally && console.log('Ally', battle.pokemon.ally);
 
@@ -105,6 +101,7 @@ function ArenaBlock() {
     const calculateDamage = useCallback(
         (move: IPokemonMove, pokemonAttacker: IPokemon, pokemonTarget: IPokemon, damageVariants: IDamageVariants) => {
             const { isCritical, multiplicatorByType } = damageVariants;
+            const levelDiff = pokemonAttacker.level / pokemonTarget.level;
 
             const getDamageByClass = () => {
                 if (move.classDamage === 'physical') return pokemonAttacker.stats.attack.current;
@@ -118,56 +115,66 @@ function ArenaBlock() {
                 return 1; // prevent NaN (0/0=NaN)
             };
 
-            let damage = ((move.power / DELTA_DAMAGE) * getDamageByClass()) / getDefenseByClass();
-            damage = damage * multiplicatorByType;
-
+            let damage = (((move.power / DELTA_DAMAGE) * getDamageByClass()) / getDefenseByClass()) * levelDiff * multiplicatorByType;
             if (isCritical) damage = damage * 2;
 
             return getRandomIntFromInterval(damage * MIN_RANDOM_MULTIPLICATOR_DAMAGE, damage * MAX_RANDOM_MULTIPLICATOR_DAMAGE);
         },
-        [dispatch]
+        []
     );
 
     const handleBattleAttack = useCallback(
-        (isEnemyAttack: boolean, move: IPokemonMove, currentHp: number, damage: number, damageVariants: IDamageVariants) => {
+        async (isEnemyAttack: boolean, move: IPokemonMove, currentHp: number, damage: number, damageVariants: IDamageVariants) => {
             const { isCritical, multiplicatorByType } = damageVariants;
             const pokemonEnemy = battle.pokemon.enemy!;
             const pokemonAlly = battle.pokemon.ally!;
-            const updateRate = () => {
-                const hpPercentage = getPercentage(currentHp, pokemonEnemy.stats.hp.total);
 
-                if (hpPercentage <= 5) return dispatch(setPokemonEnemyCaptureRate(pokemonEnemy.captureRate * 3));
-                if (hpPercentage <= 20) return dispatch(setPokemonEnemyCaptureRate(pokemonEnemy.captureRate * 2));
-                if (hpPercentage <= 50) return dispatch(setPokemonEnemyCaptureRate(pokemonEnemy.captureRate * 1.3));
-                if (hpPercentage <= 90) return dispatch(setPokemonEnemyCaptureRate(pokemonEnemy.captureRate * 1.1));
-            };
+            // /* @vite-ignore */
+            // const moveSound = (await import(`@/assets/sounds/moves/ember.mp3`))?.default || null;
+            // debugger;
+            // if (moveSound) playSound({ url: moveSound });
 
-            if (isEnemyAttack) {
-                dispatch(setPokemonPlayerCurrentHp(currentHp));
-                dispatch(addBattleLog(`{enemy} usou **${move.title}**`));
-                dispatch(addBattleLog(`{enemy} causou **${damage} de dano** em {ally}`));
+            await sleep(500);
 
-                if (move.drain) {
-                    const drainValue = damage / 2;
-                    dispatch(addBattleLog(`{enemy} drenou **${drainValue}** de {ally}`));
-                    dispatch(setPokemonEnemyCurrentHp(pokemonEnemy.stats.hp.current + drainValue));
-                }
-            } else {
-                dispatch(setPokemonEnemyCurrentHp(currentHp));
-                dispatch(addBattleLog(`{ally} usou **${move.title}**`));
-                dispatch(addBattleLog(`{ally} causou **${damage} de dano** em {enemy}`));
-                updateRate();
-
-                if (move.drain) {
-                    const drainValue = damage / 2;
-                    dispatch(addBattleLog(`{ally} drenou **${drainValue}** de {enemy}`));
-                    dispatch(setPokemonPlayerCurrentHp(pokemonAlly.stats.hp.current + drainValue));
-                }
+            if (move.category === 'net-good-stats') {
+                handleStatsChange({
+                    pokemonAlly,
+                    pokemonEnemy,
+                    isEnemyAttack,
+                    move,
+                    dispatch
+                });
             }
 
-            if (isCritical) dispatch(addBattleLog(`**Acerto crítico!**`));
-            if (multiplicatorByType === 2) dispatch(addBattleLog('Isso foi super efetivo!'));
-            if (multiplicatorByType <= 0.5) dispatch(addBattleLog('Isso não foi nada efetivo!'));
+            if (move.category.includes('damage')) {
+                handleDamageMove({
+                    pokemonAlly,
+                    pokemonEnemy,
+                    isEnemyAttack,
+                    move,
+                    currentHp,
+                    damage,
+                    dispatch
+                });
+
+                if (multiplicatorByType === 2) {
+                    playSound({ url: hitSuperEffectiveSound });
+                    dispatch(addBattleLog('Isso foi super efetivo!'));
+                }
+
+                if (multiplicatorByType <= 0.5) {
+                    playSound({ url: hitNotEffectiveSound });
+                    dispatch(addBattleLog('Isso não foi muito efetivo!'));
+                }
+
+                if (multiplicatorByType === 1) {
+                    playSound({ url: hitSound });
+                }
+
+                if (isCritical) {
+                    dispatch(addBattleLog(`**Acerto crítico!**`));
+                }
+            }
 
             return dispatch(passRound());
         },
@@ -181,7 +188,9 @@ function ArenaBlock() {
 
             if (!pokemonAttacker || !pokemonTarget) return;
 
-            const damageVariants = getDamageVariants({ move, pokemonAttacker, pokemonTarget });
+            dispatch(setBattleStatus(isEnemyAttack ? 'on-enemy-attack' : 'on-ally-attack'));
+
+            const damageVariants = getDamageVariants({ move, pokemonTarget });
             const damage = calculateDamage(move, pokemonAttacker, pokemonTarget, damageVariants);
             const currentHp = pokemonTarget.stats.hp.current - damage;
 
@@ -201,8 +210,13 @@ function ArenaBlock() {
     const explore = async () => {
         setLoading(true);
         dispatch(resetBattleState());
+        const playerPokemonHighestLevel =
+            player?.pokemons.reduce((prev, next) => {
+                if (prev.level > next.level) return prev;
+                return next;
+            })?.level || 0;
 
-        getPokemon({ level: getRandomIntFromInterval(1, 10) })
+        getPokemon({ level: getRandomIntFromInterval(1, playerPokemonHighestLevel + 5) })
             .then((wildPokemon) => {
                 playSound({ url: wildPokemon.sound });
                 dispatch(setPokemonEnemy(wildPokemon));
@@ -218,7 +232,7 @@ function ArenaBlock() {
                     const moves = battle.pokemon.enemy.moves;
                     attack(moves[getRandomIntFromInterval(0, moves.length - 1)], true);
                 }
-            }, 1000);
+            }, 500);
         }
     }, [battle, attack]);
 
@@ -265,16 +279,14 @@ function ArenaBlock() {
                 />
             )}
 
-            {battle.status === 'pokemon-catched' && !!battle.pokemon.enemy && (
-                <PokemonCatchedBlock pokemonCatched={battle.pokemon.enemy} onExploreAgain={explore} />
-            )}
+            {battle.status === 'pokemon-catched' && <PokemonCatchedBlock pokemonCatched={battle.pokemon.enemy!} onExploreAgain={explore} />}
 
             {!!choiceNewMove.move && battle.pokemon.ally && (
                 <div className='absolute left-0 top-0 h-full w-full rounded-box bg-base-100 p-6'>
                     <div className='flex h-full w-full flex-col items-center justify-center overflow-hidden'>
                         <Avatar src={battle.pokemon.ally.sprite} alt={battle.pokemon.ally.name} color={battle.pokemon.ally.color} />
                         <span>
-                            {battle.pokemon.ally?.name} está aprendendo <b>{choiceNewMove.move.move.name}</b>
+                            {battle.pokemon.ally?.name} está aprendendo <b>{slugToTitle(choiceNewMove.move.move.name)}</b>
                         </span>
                         {choiceNewMove.showMoveToChoice ? (
                             <div className='flex flex-col justify-center gap-2 text-center'>
@@ -285,7 +297,7 @@ function ArenaBlock() {
                                             onClick={() => switchMove({ oldMove: move, newMove: choiceNewMove.move! })}
                                             className='btn btn-outline btn-secondary btn-sm'
                                         >
-                                            {move.name}
+                                            {slugToTitle(move.name)}
                                         </li>
                                     ))}
                                 </ul>

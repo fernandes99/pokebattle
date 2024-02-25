@@ -8,7 +8,7 @@ interface AvatarProps {
 
 export const Avatar = ({ alt, src, color, size = 96, bgRadius = 75 }: AvatarProps) => {
     return (
-        <div className={`relative z-0 size=[${size}px]`}>
+        <div className={`relative z-0 size=[${size}px] max-h-[${size}px]`} style={{ maxHeight: size, maxWidth: size }}>
             <div
                 className={`absolute left-0 top-0 -z-10 h-full w-full rounded-full`}
                 style={{
@@ -16,7 +16,7 @@ export const Avatar = ({ alt, src, color, size = 96, bgRadius = 75 }: AvatarProp
                     opacity: 0.25
                 }}
             />
-            <img src={src} alt={alt} width={size} height={size} className='object-scale-down' />
+            <img src={src} alt={alt} width={size} height={size} className='object-scale-down' style={{ maxHeight: size, maxWidth: size }} />
         </div>
     );
 };

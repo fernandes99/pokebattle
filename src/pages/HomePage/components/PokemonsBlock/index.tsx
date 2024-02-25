@@ -33,7 +33,7 @@ function PokemonsBlock() {
                                                 '--thickness': '2px'
                                             }}
                                         />
-                                        <Avatar src={pokemon.sprite} alt={pokemon.name} color={pokemon.color} bgRadius={60} size={72} />
+                                        <Avatar src={pokemon.sprite} alt={pokemon.name} color={pokemon.color} size={72} />
                                     </div>
                                 </div>
                                 <div className='flex w-fit items-center gap-1 rounded-badge border border-neutral px-2 py-[2px] text-[11px] font-bold'>

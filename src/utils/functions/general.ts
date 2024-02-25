@@ -1,8 +1,8 @@
 import { PokemonService } from '@/services/pokemon';
-import { IResponseGetEvolutionChain, IResponseGetPokemonById } from '@/types/pokeApiResponses';
+import { IResponseGetEvolutionChain, IResponseGetPokemonById, TResponseStatName } from '@/types/pokeApiResponses';
 import { COLORS } from '@/constants/colors';
-import { IPokemon, IPokemonMove, IPokemonType } from '@/types/pokemon';
-import { capitalize } from './string';
+import { IPokemon, IPokemonMove, IPokemonType, TMoveStatName } from '@/types/pokemon';
+import { capitalize, slugToTitle } from './string';
 import { translatePokemonType } from '@/constants/translate';
 import { getRandomIntFromInterval } from './number';
 import {
@@ -20,6 +20,7 @@ import {
     POWER_MOVE_FALLBACK
 } from '@/constants/deltas';
 import { POKEMONS_BASE } from '@/constants/pokemons';
+import toast from 'react-hot-toast';
 
 interface GetPokemonProps {
     id?: number;
@@ -39,17 +40,36 @@ interface IFormatPokemon {
 }
 
 export const getMovePokemon = async (moveUrl: string) => {
+    const getStatName = (name: TResponseStatName) => {
+        if (name === 'special-attack') return 'specialAttack';
+        if (name === 'special-defense') return 'specialDefense';
+        return name;
+    };
+
     const response = await PokemonService.getMoveDetailByUrl(moveUrl);
     const power = response?.power ? response.power : POWER_MOVE_FALLBACK;
     const accuracy = response?.accuracy ? response.accuracy : ACCURACY_MOVE_FALLBACK;
+    const statChanges = response?.stat_changes.map((s) => {
+        const name = getStatName(s.stat.name) as TMoveStatName;
+        return {
+            name: name,
+            change: s.change,
+            target: response?.target.name
+        };
+    });
 
     return {
         id: response?.id,
         name: response?.name,
-        title: capitalize(response!.name || ''),
+        title: slugToTitle(response!.name || ''),
+        description: response?.flavor_text_entries.find((flavor) => flavor.language.name === 'en')?.flavor_text || '',
         criticalRate: response?.meta.crit_rate || 0,
+        power: power,
+        accuracy: accuracy,
         drain: response?.meta.drain,
         classDamage: response?.damage_class.name,
+        category: response?.meta.category.name,
+        statChanges,
         ailment: {
             chance: response?.meta.ailment_chance || 0,
             name: response?.meta.ailment.name || ''
@@ -58,9 +78,7 @@ export const getMovePokemon = async (moveUrl: string) => {
             color: COLORS.TYPE[response!.type.name],
             title: translatePokemonType[response!.type.name],
             name: response!.type.name
-        },
-        power: power,
-        accuracy: accuracy
+        }
     } as IPokemonMove;
 };
 
@@ -204,8 +222,14 @@ export function getPokemon({ id, name, level = 5 }: GetPokemonProps): Promise<IP
     let pokemon = id || name || null;
 
     if (pokemon === null) {
-        const base = POKEMONS_BASE.filter((item) => item.pokedex_id <= 649 && item.capture_rate >= 100);
-        pokemon = base[getRandomIntFromInterval(0, base.length)].pokedex_id;
+        try {
+            const base = POKEMONS_BASE.filter((item) => item.pokedex_id <= 649 && item.capture_rate >= 100);
+            pokemon = base[getRandomIntFromInterval(0, base.length)].pokedex_id;
+        } catch (e) {
+            console.error(e);
+            toast.error('Aconteceu um probleminha aqui! Vamos recarregar a página para você.');
+            setTimeout(() => location.reload(), 3000);
+        }
     }
 
     return new Promise((resolve, reject) => {

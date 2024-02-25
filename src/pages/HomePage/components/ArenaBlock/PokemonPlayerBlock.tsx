@@ -1,8 +1,9 @@
+import { useSelector } from 'react-redux';
+import { FaInfo, FaStar } from 'react-icons/fa6';
+
 import { Avatar } from '@/components/Avatar';
 import { IPokemon, IPokemonMove } from '@/types/pokemon';
-import { FaStar } from 'react-icons/fa6';
 import { Progress } from '@/components/Progress';
-import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 
 interface PokemonPlayerBlockProps {
@@ -12,10 +13,15 @@ interface PokemonPlayerBlockProps {
 
 export const PokemonPlayerBlock = ({ pokemon, onAttack }: PokemonPlayerBlockProps) => {
     const battle = useSelector((state: RootState) => state.battle);
+    const onAllyAttack = battle.status === 'on-ally-attack';
+    const onEnemyAttack = battle.status === 'on-enemy-attack';
+    const blockActions = battle.round === 'enemy' || onAllyAttack;
 
     return (
         <div className='flex w-full items-center gap-2 pr-2'>
-            <Avatar src={pokemon.sprite} alt={pokemon.name} color={pokemon.color} bgRadius={60} />
+            <div className={`${onAllyAttack ? 'animate-attack-bottom' : ''} ${onEnemyAttack ? 'animate-injure' : ''}`}>
+                <Avatar src={pokemon.sprite} alt={pokemon.name} color={pokemon.color} bgRadius={60} />
+            </div>
             <div className='flex flex-1 flex-col gap-2'>
                 <div className='flex gap-2'>
                     <span className='text-lg font-bold'>{pokemon.name}</span>
@@ -25,16 +31,21 @@ export const PokemonPlayerBlock = ({ pokemon, onAttack }: PokemonPlayerBlockProp
                     </div>
                 </div>
                 <Progress max={pokemon.stats.hp.total} value={pokemon.stats.hp.current} />
-                <div className={`${battle.round === 'enemy' ? 'pointer-events-none opacity-30' : ''}`}>
+                <div className={`${blockActions ? 'pointer-events-none opacity-30' : ''}`}>
                     <span className='text-xs'>Ataques:</span>
                     <div className='grid grid-cols-2 gap-1'>
                         {pokemon.moves.map((move, index) => (
-                            <div className='flex w-full flex-col gap-1' key={index}>
+                            <div className='relative flex w-full cursor-pointer select-none flex-col gap-1' key={index}>
                                 <div
                                     onClick={() => onAttack(move)}
-                                    className='flex cursor-pointer justify-between rounded-btn border border-neutral transition-all hover:scale-[1.01] hover:animate-pulse'
+                                    className='flex cursor-pointer justify-between rounded-btn border border-neutral transition-all hover:scale-[1.01]'
                                 >
                                     <div className='px-3 py-1'>
+                                        <div className='tooltip -ml-2 mr-1' data-tip={move.description}>
+                                            <button className='btn btn-circle btn-ghost btn-xs'>
+                                                <FaInfo className='opacity-40' />
+                                            </button>
+                                        </div>
                                         <span className='text-sm'>{move.title}</span>
                                     </div>
                                     <div
